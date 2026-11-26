@@ -185,8 +185,23 @@ def run(now_ms=None, dry=True, state_path=None, c=None, getf=None, sendf=None, l
     log(f"done: alerts={sent} failures={failures} stopped={stopped} mode={'dry' if dry else 'live'}")
     return {"sent": sent, "failures": failures, "stopped": stopped}
 
+def _load_watchlist(c):
+    fn = c.get("watchlist_file")
+    if not fn: return None
+    with open(os.path.join(HERE, fn)) as f:
+        return {l.strip().upper() for l in f if l.strip() and not l.startswith("#")}
+
 def _watch(getf, c):
     rows = []
+    wl = _load_watchlist(c)
+    if wl is not None:   # explicit user list only: no top-N cut, no substitution, no name filters
+        for x in getf("/api/v3/ticker/24hr"):
+            s = x["symbol"]
+            if s.endswith(c["quote"]) and s[:-len(c["quote"])] in wl:
+                qv = float(x["quoteVolume"])
+                if qv >= c.get("min_quote_volume_24h", 0): rows.append((qv, s, float(x["priceChangePercent"])))
+        rows.sort(reverse=True)
+        return rows
     for x in getf("/api/v3/ticker/24hr"):
         s = x["symbol"]
         if not s.endswith(c["quote"]) or s in c["exclude_symbols"]: continue
