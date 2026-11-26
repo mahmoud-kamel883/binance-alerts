@@ -141,6 +141,53 @@ def send(text):
     if not body.get("ok"): raise RuntimeError("telegram not ok")
     return body
 
+FOLLOW_WINDOW_MS = 48 * 3600 * 1000
+FOLLOW_TEXT = "بفضل الله وصل السعر للمستوى المرجعي الأول +2٪ ✅"
+
+def follow_ups(st, now_ms, dry, state_path, getf, sendf, c, log):
+    """Observation only: after an alert, if any closed 1h candle since the alert has a high at or above
+    the first reference level (+first pct of the alert price), post once. Not a realized profit. Expires after 48h."""
+    fails = 0; posted = 0
+    tr = st.setdefault("tracked", {})
+    lvl = 1 + c["reference_levels_pct"][0] / 100.0
+    for eid, t in list(tr.items()):
+        if now_ms > t["t0"] + FOLLOW_WINDOW_MS:
+            del tr[eid]; log(f"follow-up expired (no post): {eid}"); continue
+        k = [x for x in getf("/api/v3/klines", {"symbol": t["sym"], "interval": c["interval"], "startTime": t["t0"], "limit": 60}) if x[6] < now_ms and x[0] >= t["t0"]]
+        if not any(float(x[2]) >= t["p"] * lvl for x in k): continue
+        base = t["sym"][:-len(c["quote"])]
+        lines = [FOLLOW_TEXT, "🪙 الزوج: %s/%s" % (base, c["quote"])]
+        chat = os.environ.get("TELEGRAM_CHAT_ID", "")
+        if t.get("msg") and chat.startswith("@"):
+            lines.append("🔗 التنبيه الأصلي: https://t.me/%s/%s" % (chat[1:], t["msg"]))
+        msg = "\n".join(lines)
+        log(("[DRY-RUN follow-up] " if dry else "[SEND follow-up] ") + msg + "\n---")
+        if dry: continue
+        try:
+            sendf(msg)
+        except RateLimited: raise
+        except Exception as e:
+            fails += 1; log(f"follow-up send failed for {eid}: {type(e).__name__}"); continue
+        del tr[eid]; save_state(state_path, st, now_ms)
+        posted += 1
+        if posted >= 10: break
+    return fails
+
+TEST_TEXT = "اختبار تشغيل التنبيهات الفنية، ليست توصيات شراء أو بيع"
+
+def test_post(state_path=None, sendf=None):
+    """One-time approved channel test post. Guarded so it can never send twice."""
+    sendf = sendf or send
+    path = state_path or os.environ.get("STATE_FILE", os.path.join(HERE, "state.json"))
+    st = load_state(path)
+    if st.get("test_post_done"):
+        print("test post already done; not sending"); return 0
+    body = sendf(TEST_TEXT)
+    st["test_post_done"] = int(time.time() * 1000)
+    save_state(path, st, st["test_post_done"])
+    print("test post sent, message_id:", ((body.get("result") or {}).get("message_id")))
+    return 0
+
 def run(now_ms=None, dry=True, state_path=None, c=None, getf=None, sendf=None, log=print):
     c = c or CFG; getf = getf or get; sendf = sendf or send
     now_ms = now_ms if now_ms is not None else int(time.time() * 1000)
@@ -154,6 +201,7 @@ def run(now_ms=None, dry=True, state_path=None, c=None, getf=None, sendf=None, l
     ivl = INTERVAL_MS[c["interval"]]
     sent = failures = 0; stopped = None
     try:
+        failures += follow_ups(st, now_ms, dry, state_path, getf, sendf, c, log)
         rows = _watch(getf, c)
         for qv, sym, chg in rows:
             k = getf("/api/v3/klines", {"symbol": sym, "interval": c["interval"], "limit": 120})
@@ -171,11 +219,14 @@ def run(now_ms=None, dry=True, state_path=None, c=None, getf=None, sendf=None, l
             log(("[DRY-RUN] " if dry else "[SEND] ") + msg + "\n---")
             if not dry:
                 try:
-                    sendf(msg)
+                    body = sendf(msg)
                 except RateLimited: raise
                 except Exception as e:
                     failures += 1; log(f"send failed for {eid}: {type(e).__name__}"); continue  # not marked sent -> retried next run
-                st["sent"][eid] = now_ms; save_state(state_path, st, now_ms)
+                st["sent"][eid] = now_ms
+                mid = ((body or {}).get("result") or {}).get("message_id")
+                st.setdefault("tracked", {})[eid] = {"sym": sym, "p": d["closes"][i], "t0": k[i][6] + 1, "msg": mid}
+                save_state(state_path, st, now_ms)
             sent += 1
             if sent >= c["max_alerts_per_run"]: break
     except RateLimited as e:
@@ -224,6 +275,8 @@ def state_selftest(path=None):
     print("state selftest written:", now)
 
 if __name__ == "__main__":
+    if os.environ.get("TEST_POST") == "1":
+        sys.exit(test_post())
     if os.environ.get("STATE_SELFTEST") == "1":
         state_selftest()
     r = run(dry=os.environ.get("DRY_RUN", "1") != "0")
