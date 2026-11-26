@@ -8,6 +8,10 @@ on:
         description: "Write a harmless marker to state.json to test the state commit (dry-run only)"
         type: boolean
         default: false
+      test_post:
+        description: "Send the single approved test post (guarded: only once)"
+        type: boolean
+        default: false
 concurrency:
   group: binance-alerts
   cancel-in-progress: false
@@ -25,6 +29,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ vars.TELEGRAM_CHAT_ID }}
           DRY_RUN: ${{ vars.DRY_RUN || '1' }}
+          TEST_POST: ${{ inputs.test_post && '1' || '0' }}
           STATE_SELFTEST: ${{ inputs.state_selftest && '1' || '0' }}
       - name: Save state (dedupe IDs)
         if: always()
