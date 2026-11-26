@@ -195,9 +195,12 @@ def _watch(getf, c):
     rows = []
     wl = _load_watchlist(c)
     if wl is not None:   # explicit user list only: no top-N cut, no substitution, no name filters
+        # live status check: only pairs Binance reports as TRADING and spot-allowed right now (fails closed on error)
+        info = getf("/api/v3/exchangeInfo", {"permissions": "SPOT", "symbolStatus": "TRADING"})
+        tradable = {y["symbol"] for y in info["symbols"] if y.get("status") == "TRADING" and y.get("isSpotTradingAllowed", True)}
         for x in getf("/api/v3/ticker/24hr"):
             s = x["symbol"]
-            if s.endswith(c["quote"]) and s[:-len(c["quote"])] in wl:
+            if s in tradable and s.endswith(c["quote"]) and s[:-len(c["quote"])] in wl:
                 qv = float(x["quoteVolume"])
                 if qv >= c.get("min_quote_volume_24h", 0): rows.append((qv, s, float(x["priceChangePercent"])))
         rows.sort(reverse=True)
