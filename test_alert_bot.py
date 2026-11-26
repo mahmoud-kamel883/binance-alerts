@@ -101,6 +101,10 @@ class T(unittest.TestCase):
     def test_no_signal_no_alert(self):
         msgs = []; self.go(make_klines(signal=False), msgs.append); self.assertEqual(msgs, [])
 
+    def test_state_selftest_writes_marker(self):
+        b.state_selftest(self.sp)
+        self.assertIn("selftest_at_ms", b.load_state(self.sp))
+
     def test_no_identity_cache_reuse(self):
         a = b.prepare(make_klines()[:-1]); c2 = b.prepare(make_klines(signal=False)[:-1])
         self.assertNotEqual(a["closes"][-1], c2["closes"][-1])
