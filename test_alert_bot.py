@@ -20,7 +20,7 @@ def make_klines(n=120, signal=True):
     k.append([t0 + n * IV, "1", "1", "1", "1", "1", t0 + (n + 1) * IV - 1])  # open candle
     return k
 
-CFG = dict(b.CFG, required_conditions=["rsi_recovery", "volume_spike"], min_conditions_met=2, rsi_cross_level=40,
+CFG = dict(b.CFG, watchlist_file=None, required_conditions=["rsi_recovery", "volume_spike"], min_conditions_met=2, rsi_cross_level=40,
            rsi_lookback=8, cooldown_candles=3, top_n=1, max_alerts_per_run=5)
 
 def fake_get(klines):
@@ -57,6 +57,22 @@ class T(unittest.TestCase):
         self.assertNotIn("e-", b._num(0.00000123))
         self.assertEqual(b._num(0.5), "0.5")
         self.assertEqual(b._num(1234.5), "1234.5")
+
+    def test_explicit_watchlist_only(self):
+        import tempfile
+        d = tempfile.mkdtemp(); fn = os.path.join(d, "wl.txt")
+        open(fn, "w").write("AAA\nBBB\n")
+        orig = b.HERE; b.HERE = d
+        try:
+            cfg = dict(b.CFG, watchlist_file="wl.txt", min_quote_volume_24h=0, top_n=1)
+            rows = [{"symbol": "AAAUSDT", "quoteVolume": "10", "priceChangePercent": "1"},
+                    {"symbol": "BBBUSDT", "quoteVolume": "20", "priceChangePercent": "1"},
+                    {"symbol": "CCCUSDT", "quoteVolume": "999999999", "priceChangePercent": "1"},
+                    {"symbol": "AAABTC", "quoteVolume": "5", "priceChangePercent": "1"}]
+            got = b._watch(lambda p, q=None: rows, cfg)
+        finally:
+            b.HERE = orig
+        self.assertEqual([r[1] for r in got], ["BBBUSDT", "AAAUSDT"])
 
     def test_duplicate_invocation_same_candle(self):
         msgs = []
