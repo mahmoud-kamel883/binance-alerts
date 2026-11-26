@@ -49,7 +49,7 @@ class T(unittest.TestCase):
             self.assertIn("%s٪ ➜ %s" % (p, v), m)
         self.assertIn("SPOT", m); self.assertNotIn("/4", m)
         self.assertIn("ليس توصية", m)
-        for bad in ("BUY", "Stop", "TP1", "وقف", "شراء الآن", "e-"):
+        for bad in ("BUY", "TP1", "وقف", "شراء الآن", "e-"):
             self.assertNotIn(bad, m)
 
     def test_small_price_has_no_scientific_notation(self):
@@ -151,7 +151,7 @@ class FormatExact(unittest.TestCase):
         m = b.fmt("ABCUSDT", 100.0, {"rsi_recovery": True}, 45.0, 1.0, 0)
         want = "\n".join(["🚀 تنبيه فني - BINANCE", "🪙 الزوج: ABC/USDT", "📊 السوق: SPOT فقط",
                           "💰 سعر الرصد: 100 USDT", "📐 أهداف مرجعية:", "• +2٪ ➜ 102", "• +4٪ ➜ 104",
-                          "• +10٪ ➜ 110", "• +25٪ ➜ 125", "⚠️ رصد فني فقط، وليس توصية بالشراء أو البيع."])
+                          "• +10٪ ➜ 110", "• +25٪ ➜ 125", "• Stop Loss (-7٪) ➜ 93", "⚠️ رصد فني فقط، وليس توصية بالشراء أو البيع."])
         self.assertEqual(m, want)
 
 class FollowTest(unittest.TestCase):
