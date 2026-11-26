@@ -112,6 +112,8 @@ def fmt(sym, price, res, rsi_v, chg, close_ms, c=None):
              "💰 سعر الرصد: %s %s" % (_num(price), c["quote"]),
              "📐 أهداف مرجعية:"]
     lines += ["• +%g٪ ➜ %s" % (p, _num(price * (1 + p / 100.0))) for p in c["reference_levels_pct"]]
+    sl = c.get("stop_loss_pct", 7)   # user-requested line, shown as plain arithmetic from the observed price
+    lines += ["• Stop Loss (-%g٪) ➜ %s" % (sl, _num(price * (1 - sl / 100.0)))]
     lines += ["⚠️ رصد فني فقط، وليس توصية بالشراء أو البيع."]
     return "\n".join(lines)
 
