@@ -146,5 +146,35 @@ class T(unittest.TestCase):
         a = b.prepare(make_klines()[:-1]); c2 = b.prepare(make_klines(signal=False)[:-1])
         self.assertNotEqual(a["closes"][-1], c2["closes"][-1])
 
+
+class FollowTest(unittest.TestCase):
+    def test_follow_up_once_and_expiry(self):
+        import os, tempfile
+        os.environ["TELEGRAM_CHAT_ID"] = "@chan"
+        c = dict(b.CFG); t0 = 1_000_000_000_000
+        st = {"sent": {}, "tracked": {"e1": {"sym": "AAAUSDT", "p": 100.0, "t0": t0, "msg": 7},
+                                      "e2": {"sym": "BBBUSDT", "p": 100.0, "t0": t0, "msg": 8}}}
+        def getf(p, q=None):
+            hi = 102.0 if q["symbol"] == "AAAUSDT" else 101.9
+            return [[t0, 0, str(hi), 0, 0, 0, t0 + 3599999]]
+        sent = []
+        path = tempfile.mktemp()
+        f = b.follow_ups(st, t0 + 4000000, False, path, getf, sent.append, c, lambda *a: None)
+        self.assertEqual(f, 0); self.assertEqual(len(sent), 1)
+        self.assertIn("AAA/USDT", sent[0]); self.assertIn("https://t.me/chan/7", sent[0]); self.assertNotIn("e1", st["tracked"])
+        b.follow_ups(st, t0 + 4000000, False, path, getf, sent.append, c, lambda *a: None)
+        self.assertEqual(len(sent), 1)   # no repeat
+        b.follow_ups(st, t0 + b.FOLLOW_WINDOW_MS + 1, False, path, getf, sent.append, c, lambda *a: None)
+        self.assertEqual(st["tracked"], {})   # expired, never posted
+        dry = {"sent": {}, "tracked": {"e1": {"sym": "AAAUSDT", "p": 100.0, "t0": t0, "msg": 7}}}
+        b.follow_ups(dry, t0 + 4000000, True, path, getf, sent.append, c, lambda *a: None)
+        self.assertEqual(len(sent), 1); self.assertIn("e1", dry["tracked"])
+    def test_test_post_only_once(self):
+        import tempfile
+        p = tempfile.mktemp(); sent = []
+        b.test_post(p, lambda m: sent.append(m) or {"result": {"message_id": 1}})
+        b.test_post(p, lambda m: sent.append(m) or {"result": {"message_id": 2}})
+        self.assertEqual(len(sent), 1)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
