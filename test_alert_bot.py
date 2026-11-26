@@ -40,7 +40,23 @@ class T(unittest.TestCase):
     def test_signal_fires_with_time_and_units(self):
         msgs = []; r = self.go(make_klines(), msgs.append)
         self.assertEqual(r["sent"], 1, self.log)
-        self.assertIn("USDT", msgs[0]); self.assertIn("UTC", msgs[0]); self.assertIn("ABCUSDT", msgs[0])
+        self.assertIn("USDT", msgs[0]); self.assertIn("UTC", msgs[0]); self.assertIn("ABC/USDT", msgs[0])
+
+    def test_message_format_neutral_with_reference_levels(self):
+        res = {"rsi_recovery": True, "above_ma": True, "volume_spike": True, "breakout": False}
+        m = b.fmt("ABCUSDT", 100.0, res, 45.0, 1.0, NOW - 5 * 60000 - 1)
+        for p, v in (("+2", "102"), ("+4", "104"), ("+10", "110"), ("+25", "125")):
+            self.assertIn("%s٪ ➜ %s" % (p, v), m)
+        self.assertIn("SPOT", m); self.assertIn("3/4", m)
+        self.assertIn("مش تقييم لاحتمال النجاح", m)
+        self.assertIn("ليس توصية", m)
+        for bad in ("BUY", "Stop", "TP1", "وقف", "شراء الآن", "e-"):
+            self.assertNotIn(bad, m)
+
+    def test_small_price_has_no_scientific_notation(self):
+        self.assertNotIn("e-", b._num(0.00000123))
+        self.assertEqual(b._num(0.5), "0.5")
+        self.assertEqual(b._num(1234.5), "1234.5")
 
     def test_duplicate_invocation_same_candle(self):
         msgs = []
