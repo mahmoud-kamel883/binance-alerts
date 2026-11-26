@@ -96,19 +96,37 @@ def save_state(path, st, now_ms):
     with open(tmp, "w") as f: json.dump(st, f, indent=1, sort_keys=True)
     os.replace(tmp, path)
 
+def _num(x):
+    """Plain decimal text, no scientific notation, up to 8 significant digits."""
+    if x >= 1000: t = "%.2f" % x
+    elif x >= 1: t = "%.4f" % x
+    else: t = ("%.8f" % x) if x >= 0.0001 else ("%.10f" % x)
+    return t.rstrip("0").rstrip(".") if "." in t else t
+
 def fmt(sym, price, res, rsi_v, chg, close_ms, c=None):
     c = c or CFG
     t = datetime.datetime.fromtimestamp((close_ms + 1) / 1000, datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    names = {"rsi_recovery": "RSI عاد فوق %d بعد ما نزل تحت المستوى" % c["rsi_cross_level"],
+    names = {"rsi_recovery": "RSI عاد فوق %d بعد ما نزل تحت المستوى خلال آخر %d شمعة" % (c["rsi_cross_level"], c["rsi_lookback"]),
              "above_ma": "السعر فوق متوسط %d شمعة" % c["ma_period"],
              "volume_spike": "حجم التداول أعلى من %gx متوسط آخر %d شمعة" % (c["volume_multiple"], c["volume_period"]),
              "breakout": "كسر أعلى سعر في آخر %d شمعة" % c["breakout_period"]}
-    lines = ["تنبيه فني: %s (إطار %s)" % (sym, c["interval"]),
-             "إغلاق الشمعة: %s" % t,
-             "السعر: %g USDT | تغير 24س: %+.1f%% | RSI: %.0f" % (price, chg, rsi_v),
-             "الشروط المتحققة:"]
-    lines += ["- " + names[k] for k, v in res.items() if v]
-    lines += ["", "هذا رصد لشروط فنية فقط، وليس توصية بالشراء أو البيع ولا يضمن ارتفاعًا. القرار والمخاطرة على القارئ."]
+    base = sym[:-len(c["quote"])] if sym.endswith(c["quote"]) else sym
+    met = [k for k, v in res.items() if v]
+    lines = ["🚀 تنبيه فني - BINANCE",
+             "═══════════════════",
+             "🪙 الزوج: %s/%s" % (base, c["quote"]),
+             "📊 السوق: SPOT فقط",
+             "💰 سعر الرصد: %s %s" % (_num(price), c["quote"]),
+             "🕒 إغلاق الشمعة (%s): %s" % (c["interval"], t),
+             "",
+             "📐 مستويات مرجعية من سعر الرصد (حساب نسب فقط، مش أهداف متوقعة أو مضمونة):"]
+    lines += ["• +%g٪ ➜ %s" % (p, _num(price * (1 + p / 100.0))) for p in c["reference_levels_pct"]]
+    lines += ["",
+              "✅ الشروط المتحققة: %d/%d" % (len(met), len(res))]
+    lines += ["- " + names[k] for k in met]
+    lines += ["العدد مش تقييم لاحتمال النجاح.",
+              "",
+              "⚠️ رصد فني فقط، وليس توصية بالشراء أو البيع، ولا يضمن ارتفاع السعر أو وصوله لأي مستوى. القرار والمخاطرة على القارئ."]
     return "\n".join(lines)
 
 def send(text):
