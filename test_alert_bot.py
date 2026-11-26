@@ -40,15 +40,14 @@ class T(unittest.TestCase):
     def test_signal_fires_with_time_and_units(self):
         msgs = []; r = self.go(make_klines(), msgs.append)
         self.assertEqual(r["sent"], 1, self.log)
-        self.assertIn("USDT", msgs[0]); self.assertIn("UTC", msgs[0]); self.assertIn("ABC/USDT", msgs[0])
+        self.assertIn("USDT", msgs[0]); self.assertNotIn("UTC", msgs[0]); self.assertIn("ABC/USDT", msgs[0])
 
     def test_message_format_neutral_with_reference_levels(self):
         res = {"rsi_recovery": True, "above_ma": True, "volume_spike": True, "breakout": False}
         m = b.fmt("ABCUSDT", 100.0, res, 45.0, 1.0, NOW - 5 * 60000 - 1)
         for p, v in (("+2", "102"), ("+4", "104"), ("+10", "110"), ("+25", "125")):
             self.assertIn("%s٪ ➜ %s" % (p, v), m)
-        self.assertIn("SPOT", m); self.assertIn("3/4", m)
-        self.assertIn("مش تقييم لاحتمال النجاح", m)
+        self.assertIn("SPOT", m); self.assertNotIn("/4", m)
         self.assertIn("ليس توصية", m)
         for bad in ("BUY", "Stop", "TP1", "وقف", "شراء الآن", "e-"):
             self.assertNotIn(bad, m)
@@ -146,6 +145,14 @@ class T(unittest.TestCase):
         a = b.prepare(make_klines()[:-1]); c2 = b.prepare(make_klines(signal=False)[:-1])
         self.assertNotEqual(a["closes"][-1], c2["closes"][-1])
 
+
+class FormatExact(unittest.TestCase):
+    def test_approved_exact_text(self):
+        m = b.fmt("ABCUSDT", 100.0, {"rsi_recovery": True}, 45.0, 1.0, 0)
+        want = "\n".join(["🚀 تنبيه فني - BINANCE", "🪙 الزوج: ABC/USDT", "📊 السوق: SPOT فقط",
+                          "💰 سعر الرصد: 100 USDT", "📐 أهداف مرجعية:", "• +2٪ ➜ 102", "• +4٪ ➜ 104",
+                          "• +10٪ ➜ 110", "• +25٪ ➜ 125", "⚠️ رصد فني فقط، وليس توصية بالشراء أو البيع."])
+        self.assertEqual(m, want)
 
 class FollowTest(unittest.TestCase):
     def test_follow_up_once_and_expiry(self):
