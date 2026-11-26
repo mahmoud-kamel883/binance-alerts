@@ -105,28 +105,14 @@ def _num(x):
 
 def fmt(sym, price, res, rsi_v, chg, close_ms, c=None):
     c = c or CFG
-    t = datetime.datetime.fromtimestamp((close_ms + 1) / 1000, datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    names = {"rsi_recovery": "RSI عاد فوق %d بعد ما نزل تحت المستوى خلال آخر %d شمعة" % (c["rsi_cross_level"], c["rsi_lookback"]),
-             "above_ma": "السعر فوق متوسط %d شمعة" % c["ma_period"],
-             "volume_spike": "حجم التداول أعلى من %gx متوسط آخر %d شمعة" % (c["volume_multiple"], c["volume_period"]),
-             "breakout": "كسر أعلى سعر في آخر %d شمعة" % c["breakout_period"]}
     base = sym[:-len(c["quote"])] if sym.endswith(c["quote"]) else sym
-    met = [k for k, v in res.items() if v]
     lines = ["🚀 تنبيه فني - BINANCE",
-             "═══════════════════",
              "🪙 الزوج: %s/%s" % (base, c["quote"]),
              "📊 السوق: SPOT فقط",
              "💰 سعر الرصد: %s %s" % (_num(price), c["quote"]),
-             "🕒 إغلاق الشمعة (%s): %s" % (c["interval"], t),
-             "",
-             "📐 مستويات مرجعية من سعر الرصد (حساب نسب فقط، مش أهداف متوقعة أو مضمونة):"]
+             "📐 أهداف مرجعية:"]
     lines += ["• +%g٪ ➜ %s" % (p, _num(price * (1 + p / 100.0))) for p in c["reference_levels_pct"]]
-    lines += ["",
-              "✅ الشروط المتحققة: %d/%d" % (len(met), len(res))]
-    lines += ["- " + names[k] for k in met]
-    lines += ["العدد مش تقييم لاحتمال النجاح.",
-              "",
-              "⚠️ رصد فني فقط، وليس توصية بالشراء أو البيع، ولا يضمن ارتفاع السعر أو وصوله لأي مستوى. القرار والمخاطرة على القارئ."]
+    lines += ["⚠️ رصد فني فقط، وليس توصية بالشراء أو البيع."]
     return "\n".join(lines)
 
 def send(text):
