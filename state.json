@@ -1,6 +1,17 @@
 {
  "blocked_until": {},
  "selftest_at_ms": 1795663588405,
- "sent": {},
- "test_post_done": 1795667275538
+ "sent": {
+  "RAREUSDT|1h|1795698000000": 1795705101815
+ },
+ "test_post_done": 1795667275538,
+ "tracked": {
+  "RAREUSDT|1h|1795698000000": {
+   "msg": 1194,
+   "p": 0.01228,
+   "posted": 1795705142169,
+   "sym": "RAREUSDT",
+   "t0": 1795701600000
+  }
+ }
 }
