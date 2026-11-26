@@ -109,7 +109,7 @@ def fmt(sym, price, res, rsi_v, chg, close_ms, c=None):
     lines = ["🚀 تنبيه فني - BINANCE",
              "🪙 الزوج: %s/%s" % (base, c["quote"]),
              "📊 السوق: SPOT فقط",
-             "💰 سعر الرصد: %s %s" % (_num(price), c["quote"]),
+             "💰 سعر وقت النشر: %s %s" % (_num(price), c["quote"]),
              "📐 أهداف مرجعية:"]
     lines += ["• +%g٪ ➜ %s" % (p, _num(price * (1 + p / 100.0))) for p in c["reference_levels_pct"]]
     sl = c.get("stop_loss_pct", 7)   # user-requested line, shown as plain arithmetic from the observed price
@@ -211,7 +211,14 @@ def run(now_ms=None, dry=True, state_path=None, c=None, getf=None, sendf=None, l
             eid = event_id(sym, c["interval"], k[i][0])
             if eid in st["sent"]: continue                  # durable same-candle dedupe
             if any(passes(conditions_at(d, j, c), c) for j in range(i - c["cooldown_candles"], i)): continue
-            msg = fmt(sym, d["closes"][i], res, d["rsi"][i], chg, k[i][6], c)
+            # publication-time price: fetched right before sending, base for the shown levels, the stop line and follow-up
+            try:
+                live = float(getf("/api/v3/ticker/price", {"symbol": sym})["price"])
+                if not live > 0: raise ValueError("bad price")
+            except RateLimited: raise
+            except Exception as e:
+                failures += 1; log(f"skip {eid}: live price unavailable ({type(e).__name__}); not sent, retried next run"); continue
+            msg = fmt(sym, live, res, d["rsi"][i], chg, k[i][6], c)
             log(("[DRY-RUN] " if dry else "[SEND] ") + msg + "\n---")
             if not dry:
                 try:
@@ -221,7 +228,7 @@ def run(now_ms=None, dry=True, state_path=None, c=None, getf=None, sendf=None, l
                     failures += 1; log(f"send failed for {eid}: {type(e).__name__}"); continue  # not marked sent -> retried next run
                 st["sent"][eid] = now_ms
                 mid = ((body or {}).get("result") or {}).get("message_id")
-                st.setdefault("tracked", {})[eid] = {"sym": sym, "p": d["closes"][i], "t0": k[i][6] + 1, "posted": int(time.time() * 1000), "msg": mid}
+                st.setdefault("tracked", {})[eid] = {"sym": sym, "p": live, "t0": k[i][6] + 1, "posted": int(time.time() * 1000), "msg": mid}
                 save_state(state_path, st, now_ms)
             sent += 1
             if sent >= c["max_alerts_per_run"]: break
