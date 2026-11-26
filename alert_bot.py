@@ -179,6 +179,16 @@ def _watch(getf, c):
     rows.sort(reverse=True)
     return rows[:c["top_n"]]
 
+def state_selftest(path=None):
+    """Dry-run helper: records a harmless marker in state.json so the workflow's commit step can be verified. No network, no sends."""
+    path = path or os.environ.get("STATE_FILE", os.path.join(HERE, "state.json"))
+    now = int(time.time() * 1000)
+    st = load_state(path); st["selftest_at_ms"] = now
+    save_state(path, st, now)
+    print("state selftest written:", now)
+
 if __name__ == "__main__":
+    if os.environ.get("STATE_SELFTEST") == "1":
+        state_selftest()
     r = run(dry=os.environ.get("DRY_RUN", "1") != "0")
     sys.exit(1 if (r["failures"] or r["stopped"]) else 0)
