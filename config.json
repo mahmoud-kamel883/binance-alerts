@@ -15,5 +15,6 @@
   "required_conditions": ["rsi_recovery", "above_ma", "volume_spike"],
   "min_conditions_met": 3,
   "cooldown_candles": 12,
-  "max_alerts_per_run": 5
+  "max_alerts_per_run": 5,
+  "reference_levels_pct": [2, 4, 10, 25]
 }
