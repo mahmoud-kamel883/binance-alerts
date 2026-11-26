@@ -151,12 +151,13 @@ class FollowTest(unittest.TestCase):
     def test_follow_up_once_and_expiry(self):
         import os, tempfile
         os.environ["TELEGRAM_CHAT_ID"] = "@chan"
-        c = dict(b.CFG); t0 = 1_000_000_000_000
-        st = {"sent": {}, "tracked": {"e1": {"sym": "AAAUSDT", "p": 100.0, "t0": t0, "msg": 7},
-                                      "e2": {"sym": "BBBUSDT", "p": 100.0, "t0": t0, "msg": 8}}}
+        c = dict(b.CFG); t0 = 999_999_960_000
+        st = {"sent": {}, "tracked": {"e1": {"sym": "AAAUSDT", "p": 100.0, "t0": t0, "posted": t0, "msg": 7},
+                                      "e2": {"sym": "BBBUSDT", "p": 100.0, "t0": t0, "posted": t0, "msg": 8}}}
         def getf(p, q=None):
             hi = 102.0 if q["symbol"] == "AAAUSDT" else 101.9
-            return [[t0, 0, str(hi), 0, 0, 0, t0 + 3599999]]
+            pre = [[t0 - 60000, 0, '999', 0, 0, 0, t0 - 1]]  # before publication: must be ignored
+            return pre + [[t0, 0, str(hi), 0, 0, 0, t0 + 59999]]
         sent = []
         path = tempfile.mktemp()
         f = b.follow_ups(st, t0 + 4000000, False, path, getf, sent.append, c, lambda *a: None)
@@ -166,7 +167,7 @@ class FollowTest(unittest.TestCase):
         self.assertEqual(len(sent), 1)   # no repeat
         b.follow_ups(st, t0 + b.FOLLOW_WINDOW_MS + 1, False, path, getf, sent.append, c, lambda *a: None)
         self.assertEqual(st["tracked"], {})   # expired, never posted
-        dry = {"sent": {}, "tracked": {"e1": {"sym": "AAAUSDT", "p": 100.0, "t0": t0, "msg": 7}}}
+        dry = {"sent": {}, "tracked": {"e1": {"sym": "AAAUSDT", "p": 100.0, "t0": t0, "posted": t0, "msg": 7}}}
         b.follow_ups(dry, t0 + 4000000, True, path, getf, sent.append, c, lambda *a: None)
         self.assertEqual(len(sent), 1); self.assertIn("e1", dry["tracked"])
     def test_test_post_only_once(self):
