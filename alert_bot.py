@@ -145,16 +145,24 @@ FOLLOW_WINDOW_MS = 48 * 3600 * 1000
 FOLLOW_TEXT = "بفضل الله وصل السعر للمستوى المرجعي الأول +2٪ ✅"
 
 def follow_ups(st, now_ms, dry, state_path, getf, sendf, c, log):
-    """Observation only: after an alert, if any closed 1h candle since the alert has a high at or above
+    """Observation only: after an alert, if any closed 1m candle opened after publication has a high at or above
     the first reference level (+first pct of the alert price), post once. Not a realized profit. Expires after 48h."""
     fails = 0; posted = 0
     tr = st.setdefault("tracked", {})
     lvl = 1 + c["reference_levels_pct"][0] / 100.0
     for eid, t in list(tr.items()):
-        if now_ms > t["t0"] + FOLLOW_WINDOW_MS:
+        post_ms = t.get("posted") or t["t0"]
+        if now_ms > post_ms + FOLLOW_WINDOW_MS:
             del tr[eid]; log(f"follow-up expired (no post): {eid}"); continue
-        k = [x for x in getf("/api/v3/klines", {"symbol": t["sym"], "interval": c["interval"], "startTime": t["t0"], "limit": 60}) if x[6] < now_ms and x[0] >= t["t0"]]
-        if not any(float(x[2]) >= t["p"] * lvl for x in k): continue
+        # 1-minute candles that OPENED after the alert was published and have closed; nothing from before publication counts
+        start = -(-post_ms // 60000) * 60000
+        hit = False; cur = start
+        for _ in range(4):
+            k = [x for x in getf("/api/v3/klines", {"symbol": t["sym"], "interval": "1m", "startTime": cur, "limit": 1000}) if x[6] < now_ms and x[0] >= start]
+            if any(float(x[2]) >= t["p"] * lvl for x in k): hit = True; break
+            if len(k) < 1000: break
+            cur = k[-1][6] + 1
+        if not hit: continue
         base = t["sym"][:-len(c["quote"])]
         lines = [FOLLOW_TEXT, "🪙 الزوج: %s/%s" % (base, c["quote"])]
         chat = os.environ.get("TELEGRAM_CHAT_ID", "")
@@ -225,7 +233,7 @@ def run(now_ms=None, dry=True, state_path=None, c=None, getf=None, sendf=None, l
                     failures += 1; log(f"send failed for {eid}: {type(e).__name__}"); continue  # not marked sent -> retried next run
                 st["sent"][eid] = now_ms
                 mid = ((body or {}).get("result") or {}).get("message_id")
-                st.setdefault("tracked", {})[eid] = {"sym": sym, "p": d["closes"][i], "t0": k[i][6] + 1, "msg": mid}
+                st.setdefault("tracked", {})[eid] = {"sym": sym, "p": d["closes"][i], "t0": k[i][6] + 1, "posted": int(time.time() * 1000), "msg": mid}
                 save_state(state_path, st, now_ms)
             sent += 1
             if sent >= c["max_alerts_per_run"]: break
