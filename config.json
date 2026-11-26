@@ -1,10 +1,22 @@
 {
   "quote": "USDT",
   "top_n": 50,
-  "min_quote_volume_24h": 5000000,
+  "min_quote_volume_24h": 0,
   "interval": "1h",
-  "exclude_substrings": ["UP", "DOWN", "BULL", "BEAR"],
-  "exclude_symbols": ["USDCUSDT", "FDUSDUSDT", "TUSDUSDT", "USDPUSDT", "EURUSDT", "DAIUSDT"],
+  "exclude_substrings": [
+    "UP",
+    "DOWN",
+    "BULL",
+    "BEAR"
+  ],
+  "exclude_symbols": [
+    "USDCUSDT",
+    "FDUSDUSDT",
+    "TUSDUSDT",
+    "USDPUSDT",
+    "EURUSDT",
+    "DAIUSDT"
+  ],
   "rsi_period": 14,
   "rsi_cross_level": 40,
   "rsi_lookback": 6,
@@ -12,9 +24,19 @@
   "volume_period": 20,
   "volume_multiple": 2.0,
   "breakout_period": 20,
-  "required_conditions": ["rsi_recovery", "above_ma", "volume_spike"],
+  "required_conditions": [
+    "rsi_recovery",
+    "above_ma",
+    "volume_spike"
+  ],
   "min_conditions_met": 3,
   "cooldown_candles": 12,
   "max_alerts_per_run": 5,
-  "reference_levels_pct": [2, 4, 10, 25]
+  "reference_levels_pct": [
+    2,
+    4,
+    10,
+    25
+  ],
+  "watchlist_file": "watchlist.txt"
 }
