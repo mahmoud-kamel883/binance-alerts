@@ -2,7 +2,12 @@ name: binance-alerts
 on:
   schedule:
     - cron: "7 * * * *"   # hourly at minute 7 (1h candles; avoids the busy top of the hour). Delays/skips possible.
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      state_selftest:
+        description: "Write a harmless marker to state.json to test the state commit (dry-run only)"
+        type: boolean
+        default: false
 concurrency:
   group: binance-alerts
   cancel-in-progress: false
@@ -20,6 +25,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ vars.TELEGRAM_CHAT_ID }}
           DRY_RUN: ${{ vars.DRY_RUN || '1' }}
+          STATE_SELFTEST: ${{ inputs.state_selftest && '1' || '0' }}
       - name: Save state (dedupe IDs)
         if: always()
         run: |
