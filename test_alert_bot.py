@@ -27,8 +27,12 @@ def fake_get(klines):
     def g(path, params=None):
         if path.endswith("ticker/24hr"):
             return [{"symbol": "ABCUSDT", "quoteVolume": "9000000", "priceChangePercent": "2.0"}]
+        if path.endswith("ticker/price"):
+            return {"symbol": params["symbol"], "price": str(LIVE[0])}
         return klines
     return g
+
+LIVE = [100.0]
 
 class T(unittest.TestCase):
     def setUp(self):
@@ -150,7 +154,7 @@ class FormatExact(unittest.TestCase):
     def test_approved_exact_text(self):
         m = b.fmt("ABCUSDT", 100.0, {"rsi_recovery": True}, 45.0, 1.0, 0)
         want = "\n".join(["🚀 تنبيه فني - BINANCE", "🪙 الزوج: ABC/USDT", "📊 السوق: SPOT فقط",
-                          "💰 سعر الرصد: 100 USDT", "📐 أهداف مرجعية:", "• +2٪ ➜ 102", "• +4٪ ➜ 104",
+                          "💰 سعر وقت النشر: 100 USDT", "📐 أهداف مرجعية:", "• +2٪ ➜ 102", "• +4٪ ➜ 104",
                           "• +10٪ ➜ 110", "• +25٪ ➜ 125", "• Stop Loss (-7٪) ➜ 93", "⚠️ رصد فني فقط، وليس توصية بالشراء أو البيع."])
         self.assertEqual(m, want)
 
@@ -183,6 +187,24 @@ class FollowTest(unittest.TestCase):
         b.test_post(p, lambda m: sent.append(m) or {"result": {"message_id": 1}})
         b.test_post(p, lambda m: sent.append(m) or {"result": {"message_id": 2}})
         self.assertEqual(len(sent), 1)
+
+class LivePrice(unittest.TestCase):
+    def setUp(self):
+        self.d = tempfile.mkdtemp(); self.sp = os.path.join(self.d, "state.json")
+    def run_(self, getf, sent):
+        return b.run(now_ms=NOW, dry=False, state_path=self.sp, c=CFG, getf=getf, sendf=lambda m: sent.append(m) or {"result": {"message_id": 5}}, log=lambda *a: None)
+    def test_levels_and_tracking_use_publication_price(self):
+        LIVE[0] = 80.0; sent = []
+        r = self.run_(fake_get(make_klines()), sent)
+        self.assertEqual(r["sent"], 1); self.assertIn("سعر وقت النشر: 80 USDT", sent[0]); self.assertIn("• +2٪ ➜ 81.6", sent[0]); self.assertIn("• Stop Loss (-7٪) ➜ 74.4", sent[0])
+        self.assertEqual(list(b.load_state(self.sp)["tracked"].values())[0]["p"], 80.0)
+    def test_price_fetch_failure_fails_closed(self):
+        g0 = fake_get(make_klines()); sent = []
+        def g(path, params=None):
+            if path.endswith("ticker/price"): raise urllib.error.URLError("x")
+            return g0(path, params)
+        r = self.run_(g, sent)
+        self.assertEqual(sent, []); self.assertEqual(r["failures"], 1); self.assertEqual(b.load_state(self.sp)["sent"], {})
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
