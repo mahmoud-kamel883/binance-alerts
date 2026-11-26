@@ -69,10 +69,15 @@ class T(unittest.TestCase):
                     {"symbol": "BBBUSDT", "quoteVolume": "20", "priceChangePercent": "1"},
                     {"symbol": "CCCUSDT", "quoteVolume": "999999999", "priceChangePercent": "1"},
                     {"symbol": "AAABTC", "quoteVolume": "5", "priceChangePercent": "1"}]
-            got = b._watch(lambda p, q=None: rows, cfg)
+            info = {"symbols": [{"symbol": "AAAUSDT", "status": "TRADING", "isSpotTradingAllowed": True},
+                                {"symbol": "BBBUSDT", "status": "TRADING", "isSpotTradingAllowed": True}]}
+            got = b._watch(lambda p, q=None: info if "exchangeInfo" in p else rows, cfg)
+            info["symbols"][1]["status"] = "BREAK"   # a paused pair must drop out
+            got2 = b._watch(lambda p, q=None: info if "exchangeInfo" in p else rows, cfg)
         finally:
             b.HERE = orig
         self.assertEqual([r[1] for r in got], ["BBBUSDT", "AAAUSDT"])
+        self.assertEqual([r[1] for r in got2], ["AAAUSDT"])
 
     def test_duplicate_invocation_same_candle(self):
         msgs = []
